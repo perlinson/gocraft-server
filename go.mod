@@ -8,6 +8,9 @@ require (
 	github.com/joho/godotenv v1.5.1
 	google.golang.org/grpc v1.71.0
 	google.golang.org/protobuf v1.36.5
+	github.com/perlinson/gocraft-server/proto/auth v0.0.0
+	github.com/perlinson/gocraft-server/proto/block v0.0.0
+	github.com/perlinson/gocraft-server/proto/player v0.0.0
 )
 
 require (
