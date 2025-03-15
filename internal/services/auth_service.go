@@ -7,7 +7,7 @@ import (
 	"sync"
 	"time"
 
-	authpb "auth"
+	authpb "github.com/perlinson/gocraft-server/internal/proto/auth"
 )
 
 type AuthService struct {
@@ -60,8 +60,10 @@ func (s *AuthService) Login(ctx context.Context, req *authpb.LoginRequest) (*aut
 	s.sessions[token] = session
 	s.mu.Unlock()
 
+	expiresTime := time.Now().Add(24 * time.Hour)
 	return &authpb.LoginResponse{
-		Token: token,
+		Token:   token,
+		Expires: expiresTime.Unix(),
 		User: &authpb.User{
 			Id:   userID,
 			Name: "测试用户",

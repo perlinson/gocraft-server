@@ -4,7 +4,7 @@ import (
 	"context"
 	"sync"
 
-	playerpb "player"
+	playerpb "github.com/perlinson/gocraft-server/internal/proto/player"
 )
 
 type PlayerService struct {

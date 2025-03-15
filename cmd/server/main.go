@@ -8,6 +8,7 @@ import (
 	authpb "github.com/perlinson/gocraft-server/internal/proto/auth"
 	blockpb "github.com/perlinson/gocraft-server/internal/proto/block"
 	playerpb "github.com/perlinson/gocraft-server/internal/proto/player"
+
 	"github.com/perlinson/gocraft-server/internal/services"
 	"google.golang.org/grpc"
 )

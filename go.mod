@@ -2,7 +2,7 @@ module github.com/perlinson/gocraft-server
 
 go 1.22.5
 
-replace github.com/perlinson/gocraft-server v0.0.0-00010101000000-000000000000 => ./
+// replace github.com/perlinson/gocraft-server v0.0.0-00010101000000-000000000000 => ./
 
 require (
 	github.com/go-sql-driver/mysql v1.7.1
@@ -10,6 +10,13 @@ require (
 	github.com/joho/godotenv v1.5.1
 	google.golang.org/grpc v1.71.0
 	google.golang.org/protobuf v1.36.5
+)
+
+// 关键：添加本地替换规则
+replace (
+    github.com/perlinson/gocraft-server/internal/proto/auth@v0.0.0-00010101000000-000000000000 => ./internal/proto/auth
+    github.com/perlinson/gocraft-server/internal/proto/block@v0.0.0-00010101000000-000000000000 => ./internal/proto/block
+    github.com/perlinson/gocraft-server/internal/proto/player@v0.0.0-00010101000000-000000000000 => ./internal/proto/player
 )
 
 require (

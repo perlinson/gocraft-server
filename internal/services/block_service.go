@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"sync"
 
-	blockpb "block"
+	blockpb "github.com/perlinson/gocraft-server/internal/proto/block"
 )
 
 type BlockService struct {

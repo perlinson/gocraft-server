@@ -13,9 +13,15 @@ message LoginRequest {
   string password = 2;
 }
 
+message User {
+  string id = 1;
+  string name = 2;
+}
+
 message LoginResponse {
   string token = 1;
   int64 expires = 2;
+  User user = 3;
 }
 
 message LogoutRequest {
