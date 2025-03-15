@@ -1,8 +1,8 @@
 syntax = "proto3";
 
-package gocraft.player;
+package player;
 
-option go_package = "github.com/perlinson/gocraft-server/proto/player";
+option go_package = "github.com/perlinson/gocraft-server/internal/proto/player";
 
 service PlayerService {
   rpc UpdateState(UpdateStateRequest) returns (UpdateStateResponse) {}

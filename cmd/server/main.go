@@ -1,13 +1,15 @@
 package main
 
 import (
-	"net"
+	"flag"
 	"log"
+	"net"
+
+	authpb "github.com/perlinson/gocraft-server/internal/proto/auth"
+	blockpb "github.com/perlinson/gocraft-server/internal/proto/block"
+	playerpb "github.com/perlinson/gocraft-server/internal/proto/player"
+	"github.com/perlinson/gocraft-server/internal/services"
 	"google.golang.org/grpc"
-	blockpb "github.com/perlinson/gocraft-server/proto/block"
-	playerpb "github.com/perlinson/gocraft-server/proto/player"
-	authpb "github.com/perlinson/gocraft-server/proto/auth"
-	"github.com/perlinson/gocraft-server/services"
 )
 
 var (
@@ -17,17 +19,18 @@ var (
 func main() {
 	flag.Parse()
 
-	err := InitStore()
-	if err != nil {
-		log.Fatal(err)
-	}
+	// 注释掉InitStore调用，根据用户要求不需要关心这部分
+	// err := InitStore()
+	// if err != nil {
+	// 	log.Fatal(err)
+	// }
 	// 创建gRPC服务器
 	grpcServer := grpc.NewServer()
 
 	// 初始化各服务
 	blockService := services.NewBlockService()
-	playerService := services.NewPlayerService()
-	authService := services.NewAuthService()
+	playerService := services.NewPlayerService(nil) // 暂时传入nil
+	authService := services.NewAuthService(nil)     // 暂时传入nil
 
 	// 注册服务
 	blockpb.RegisterBlockServiceServer(grpcServer, blockService)
@@ -39,7 +42,7 @@ func main() {
 	if err != nil {
 		log.Fatalf("failed to listen: %v", err)
 	}
-	
+
 	log.Println("Server started on :50051")
 	if err := grpcServer.Serve(lis); err != nil {
 		log.Fatalf("failed to serve: %v", err)

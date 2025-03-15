@@ -4,7 +4,8 @@ import (
 	"context"
 	"fmt"
 	"sync"
-	blockpb "github.com/perlinson/gocraft-server/proto/block"
+
+	blockpb "block"
 )
 
 type BlockService struct {
@@ -15,7 +16,7 @@ type BlockService struct {
 }
 
 type ChunkData struct {
-	blocks []int32
+	blocks  []int32
 	version int64
 }
 

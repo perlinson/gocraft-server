@@ -1,7 +1,7 @@
 syntax = "proto3";
-package gocraft.auth;
+package auth;
 
-option go_package = "github.com/perlinson/gocraft-server/proto/auth";
+option go_package = "github.com/perlinson/gocraft-server/internal/proto/auth";
 
 service AuthService {
   rpc Login(LoginRequest) returns (LoginResponse);

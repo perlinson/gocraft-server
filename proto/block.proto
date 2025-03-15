@@ -1,8 +1,8 @@
 syntax = "proto3";
 
-package gocraft.block;
+package block;
 
-option go_package = "github.com/perlinson/gocraft-server/proto/block";
+option go_package = "github.com/perlinson/gocraft-server/internal/proto/block";
 
 service BlockService {
     rpc FetchChunk(FetchChunkRequest) returns (FetchChunkResponse) {}
