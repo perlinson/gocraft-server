@@ -1,0 +1,39 @@
+syntax = "proto3";
+
+package gocraft.player;
+
+option go_package = "github.com/perlinson/gocraft-server/proto/player";
+
+service PlayerService {
+  rpc UpdateState(UpdateStateRequest) returns (UpdateStateResponse) {}
+  rpc RemovePlayer(RemovePlayerRequest) returns (RemovePlayerResponse) {}
+}
+
+message Vec3 {
+  int32 x = 1;
+  int32 y = 2;
+  int32 z = 3;
+}
+
+message PlayerState {
+  float x = 1;
+  float y = 2;
+  float z = 3;
+  float rx = 4;
+  float ry = 5;
+}
+
+message UpdateStateRequest {
+  string id = 1;
+  PlayerState state = 2;
+}
+
+message UpdateStateResponse {
+  map<string, PlayerState> players = 1;
+}
+
+message RemovePlayerRequest {
+  string id = 1;
+}
+
+message RemovePlayerResponse {}

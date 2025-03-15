@@ -1,0 +1,35 @@
+syntax = "proto3";
+
+package gocraft.block;
+
+option go_package = "github.com/perlinson/gocraft-server/proto/block";
+
+service BlockService {
+    rpc FetchChunk(FetchChunkRequest) returns (FetchChunkResponse) {}
+    rpc UpdateBlock(UpdateBlockRequest) returns (UpdateBlockResponse) {}
+}
+
+message FetchChunkRequest {
+	int32 p = 1;
+	int32 q = 2;
+	int64 version = 3;
+}
+
+message FetchChunkResponse {
+	repeated int32 blocks = 1;
+	int64 version = 2;
+}
+
+message UpdateBlockRequest {
+	string id = 1;
+	int32 p = 2;
+	int32 q = 3;
+	int32 x = 4;
+	int32 y = 5;
+	int32 z = 6;
+	int32 w = 7;
+}
+
+message UpdateBlockResponse {
+	int64 version = 1;
+}
