@@ -1,4 +1,4 @@
-package main
+package store
 
 import (
 	"database/sql"
@@ -17,11 +17,11 @@ var (
 	dbpath = flag.String("db", "", "db file name (legacy, not used with MySQL)")
 )
 
-var (
-	store *Store
-)
+// var (
+// 	store *Store
+// )
 
-func InitStore() error {
+func InitStore() (*Store, error) {
 	// Load environment variables from .env file
 	err := godotenv.Load()
 	if err != nil {
@@ -44,8 +44,8 @@ func InitStore() error {
 
 	log.Printf("Connecting to MySQL database at %s:%s/%s", dbHost, dbPort, dbName)
 
-	store, err = NewStore(dsn)
-	return err
+	store, err := NewStore(dsn)
+	return store, err
 }
 
 // Helper function to get environment variable with default value
@@ -213,12 +213,12 @@ func (s *Store) RangeBlocks(id Vec3, f func(bid Vec3, w int)) error {
 	defer rows.Close()
 
 	for rows.Next() {
-		var x, y, z, w int
+		var x, y, z, w int32
 		err := rows.Scan(&x, &y, &z, &w)
 		if err != nil {
 			return err
 		}
-		f(Vec3{x, y, z}, w)
+		f(Vec3{x, y, z}, int(w))
 	}
 
 	return rows.Err()
@@ -257,7 +257,7 @@ func (s *Store) Close() {
 	}
 }
 
-func GenrateChunkVersion() string {
+func GenerateChunkVersion() string {
 	return strconv.FormatInt(time.Now().UnixNano(), 16)
 }
 
@@ -266,7 +266,7 @@ const (
 )
 
 type Vec3 struct {
-	X, Y, Z int
+	X, Y, Z int32
 }
 
 func (v Vec3) Left() Vec3 {

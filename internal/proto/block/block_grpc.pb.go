@@ -21,6 +21,7 @@ const _ = grpc.SupportPackageIsVersion9
 const (
 	BlockService_FetchChunk_FullMethodName  = "/block.BlockService/FetchChunk"
 	BlockService_UpdateBlock_FullMethodName = "/block.BlockService/UpdateBlock"
+	BlockService_StreamChunk_FullMethodName = "/block.BlockService/StreamChunk"
 )
 
 // BlockServiceClient is the client API for BlockService service.
@@ -29,6 +30,7 @@ const (
 type BlockServiceClient interface {
 	FetchChunk(ctx context.Context, in *FetchChunkRequest, opts ...grpc.CallOption) (*FetchChunkResponse, error)
 	UpdateBlock(ctx context.Context, in *UpdateBlockRequest, opts ...grpc.CallOption) (*UpdateBlockResponse, error)
+	StreamChunk(ctx context.Context, in *ChunkRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[ChunkUpdate], error)
 }
 
 type blockServiceClient struct {
@@ -59,12 +61,32 @@ func (c *blockServiceClient) UpdateBlock(ctx context.Context, in *UpdateBlockReq
 	return out, nil
 }
 
+func (c *blockServiceClient) StreamChunk(ctx context.Context, in *ChunkRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[ChunkUpdate], error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	stream, err := c.cc.NewStream(ctx, &BlockService_ServiceDesc.Streams[0], BlockService_StreamChunk_FullMethodName, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	x := &grpc.GenericClientStream[ChunkRequest, ChunkUpdate]{ClientStream: stream}
+	if err := x.ClientStream.SendMsg(in); err != nil {
+		return nil, err
+	}
+	if err := x.ClientStream.CloseSend(); err != nil {
+		return nil, err
+	}
+	return x, nil
+}
+
+// This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
+type BlockService_StreamChunkClient = grpc.ServerStreamingClient[ChunkUpdate]
+
 // BlockServiceServer is the server API for BlockService service.
 // All implementations must embed UnimplementedBlockServiceServer
 // for forward compatibility.
 type BlockServiceServer interface {
 	FetchChunk(context.Context, *FetchChunkRequest) (*FetchChunkResponse, error)
 	UpdateBlock(context.Context, *UpdateBlockRequest) (*UpdateBlockResponse, error)
+	StreamChunk(*ChunkRequest, grpc.ServerStreamingServer[ChunkUpdate]) error
 	mustEmbedUnimplementedBlockServiceServer()
 }
 
@@ -80,6 +102,9 @@ func (UnimplementedBlockServiceServer) FetchChunk(context.Context, *FetchChunkRe
 }
 func (UnimplementedBlockServiceServer) UpdateBlock(context.Context, *UpdateBlockRequest) (*UpdateBlockResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method UpdateBlock not implemented")
+}
+func (UnimplementedBlockServiceServer) StreamChunk(*ChunkRequest, grpc.ServerStreamingServer[ChunkUpdate]) error {
+	return status.Errorf(codes.Unimplemented, "method StreamChunk not implemented")
 }
 func (UnimplementedBlockServiceServer) mustEmbedUnimplementedBlockServiceServer() {}
 func (UnimplementedBlockServiceServer) testEmbeddedByValue()                      {}
@@ -138,6 +163,17 @@ func _BlockService_UpdateBlock_Handler(srv interface{}, ctx context.Context, dec
 	return interceptor(ctx, in, info, handler)
 }
 
+func _BlockService_StreamChunk_Handler(srv interface{}, stream grpc.ServerStream) error {
+	m := new(ChunkRequest)
+	if err := stream.RecvMsg(m); err != nil {
+		return err
+	}
+	return srv.(BlockServiceServer).StreamChunk(m, &grpc.GenericServerStream[ChunkRequest, ChunkUpdate]{ServerStream: stream})
+}
+
+// This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
+type BlockService_StreamChunkServer = grpc.ServerStreamingServer[ChunkUpdate]
+
 // BlockService_ServiceDesc is the grpc.ServiceDesc for BlockService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -154,6 +190,12 @@ var BlockService_ServiceDesc = grpc.ServiceDesc{
 			Handler:    _BlockService_UpdateBlock_Handler,
 		},
 	},
-	Streams:  []grpc.StreamDesc{},
+	Streams: []grpc.StreamDesc{
+		{
+			StreamName:    "StreamChunk",
+			Handler:       _BlockService_StreamChunk_Handler,
+			ServerStreams: true,
+		},
+	},
 	Metadata: "block.proto",
 }

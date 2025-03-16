@@ -8,7 +8,9 @@ vars:
 tasks:
   generate-grpc:
     cmds:
-      - protoc --proto_path=proto --go_out=internal --go_opt=paths=source_relative --go-grpc_out=internal --go-grpc_opt=paths=source_relative proto/block.proto proto/player.proto proto/auth.proto
+      - protoc --proto_path=proto --go_out=internal/proto/auth --go_opt=paths=source_relative --go-grpc_out=internal/proto/auth --go-grpc_opt=paths=source_relative proto/auth.proto
+      - protoc --proto_path=proto --go_out=internal/proto/block --go_opt=paths=source_relative --go-grpc_out=internal/proto/block --go-grpc_opt=paths=source_relative proto/block.proto
+      - protoc --proto_path=proto --go_out=internal/proto/player --go_opt=paths=source_relative --go-grpc_out=internal/proto/player --go-grpc_opt=paths=source_relative proto/player.proto
     silent: false
   start-server:
     cmds:
