@@ -1,15 +1,17 @@
 package store
 
 import (
-	"database/sql"
 	"flag"
 	"fmt"
 	"log"
 	"os"
 	"strconv"
 	"time"
+	"context"
+	"golang.org/x/crypto/bcrypt"
 
-	_ "github.com/go-sql-driver/mysql"
+	"gorm.io/driver/mysql"
+	"gorm.io/gorm"
 	"github.com/joho/godotenv"
 )
 
@@ -44,8 +46,24 @@ func InitStore() (*Store, error) {
 
 	log.Printf("Connecting to MySQL database at %s:%s/%s", dbHost, dbPort, dbName)
 
-	store, err := NewStore(dsn)
-	return store, err
+	// Open MySQL connection using GORM
+	db, err := gorm.Open(mysql.Open(dsn), &gorm.Config{})
+	if err != nil {
+		return nil, fmt.Errorf("failed to connect to MySQL: %v", err)
+	}
+
+	store := &Store{DB: db}
+	// 确保 DB 被正确赋值
+	if store.DB == nil {
+		return nil, fmt.Errorf("DB 未初始化")
+	}
+	// Initialize database tables
+	err = store.initTables()
+	if err != nil {
+		return nil, fmt.Errorf("failed to initialize tables: %v", err)
+	}
+
+	return store, nil
 }
 
 // Helper function to get environment variable with default value
@@ -57,98 +75,100 @@ func getEnv(key, defaultValue string) string {
 	return value
 }
 
+// Store ...
 type Store struct {
-	db *sql.DB
+	DB *gorm.DB
 }
 
-func NewStore(dsn string) (*Store, error) {
-	// Open MySQL connection
-	db, err := sql.Open("mysql", dsn)
-	if err != nil {
-		return nil, fmt.Errorf("failed to connect to MySQL: %v", err)
-	}
+type Block struct {
+	ChunkX int32 `gorm:"column:chunk_x"`
+	ChunkZ int32 `gorm:"column:chunk_z"`
+	BlockX int32 `gorm:"column:block_x"`
+	BlockY int32 `gorm:"column:block_y"`
+	BlockZ int32 `gorm:"column:block_z"`
+	BlockType int32 `gorm:"column:block_type"`
+}
 
-	// Test the connection
-	err = db.Ping()
-	if err != nil {
-		return nil, fmt.Errorf("failed to ping MySQL: %v", err)
-	}
+type Chunk struct {
+	ChunkX int32 `gorm:"column:chunk_x"`
+	ChunkY int32 `gorm:"column:chunk_y"`
+	ChunkZ int32 `gorm:"column:chunk_z"`
+	Version string `gorm:"column:version"`
+}
 
-	// Set connection pool parameters
-	db.SetMaxOpenConns(25)
-	db.SetMaxIdleConns(5)
-	db.SetConnMaxLifetime(5 * time.Minute)
+type Camera struct {
+	ID int32 `gorm:"column:id"`
+	X float32 `gorm:"column:x"`
+	Y float32 `gorm:"column:y"`
+	Z float32 `gorm:"column:z"`
+	RX float32 `gorm:"column:rx"`
+	RY float32 `gorm:"column:ry"`
+}
 
-	// Create the store instance
-	store := &Store{
-		db: db,
-	}
-
-	// Initialize database tables
-	err = store.initTables()
-	if err != nil {
-		return nil, fmt.Errorf("failed to initialize tables: %v", err)
-	}
-
-	return store, nil
+type User struct {
+	ID int32 `gorm:"column:id"`
+	Username string `gorm:"column:username"`
+	Password string `gorm:"column:password"`
+	Email string `gorm:"column:email"`
 }
 
 func (s *Store) initTables() error {
 	// Create blocks table
-	_, err := s.db.Exec(`
-		CREATE TABLE IF NOT EXISTS blocks (
-			chunk_x INT NOT NULL,
-			chunk_z INT NOT NULL,
-			block_x INT NOT NULL,
-			block_y INT NOT NULL,
-			block_z INT NOT NULL,
-			block_type INT NOT NULL,
-			PRIMARY KEY (chunk_x, chunk_z, block_x, block_y, block_z)
-		)
-	`)
+	err := s.DB.AutoMigrate(&Block{})
 	if err != nil {
 		return err
 	}
 
 	// Create chunks table for version tracking
-	_, err = s.db.Exec(`
-		CREATE TABLE IF NOT EXISTS chunks (
-			chunk_x INT NOT NULL,
-			chunk_y INT NOT NULL,
-			chunk_z INT NOT NULL,
-			version VARCHAR(32) NOT NULL,
-			PRIMARY KEY (chunk_x, chunk_y, chunk_z)
-		)
-	`)
+	err = s.DB.AutoMigrate(&Chunk{})
 	if err != nil {
 		return err
 	}
 
 	// Create camera table
-	_, err = s.db.Exec(`
-		CREATE TABLE IF NOT EXISTS camera (
-			id INT NOT NULL DEFAULT 1,
-			x FLOAT NOT NULL,
-			y FLOAT NOT NULL,
-			z FLOAT NOT NULL,
-			rx FLOAT NOT NULL,
-			ry FLOAT NOT NULL,
-			PRIMARY KEY (id)
-		)
-	`)
+	err = s.DB.AutoMigrate(&Camera{})
 	if err != nil {
 		return err
 	}
 
 	// Insert default camera if not exists
-	_, err = s.db.Exec(`
-		INSERT IGNORE INTO camera (id, x, y, z, rx, ry) VALUES (1, 0, 16, 0, 0, 0)
-	`)
+	var count int64
+	err = s.DB.Model(&Camera{}).Where("id = ?", 1).Count(&count).Error
+	if err != nil {
+		return err
+	}
+	if count == 0 {
+		camera := Camera{ID: 1, X: 0, Y: 16, Z: 0, RX: 0, RY: 0}
+		err = s.DB.Create(&camera).Error
+		if err != nil {
+			return err
+		}
+	}
+
+	// Create users table
+	err = s.DB.AutoMigrate(&User{})
 	if err != nil {
 		return err
 	}
 
 	return nil
+}
+
+// UserExists 检查用户名是否已存在
+func (s *Store) UserExists(ctx context.Context, username string) (bool, error) {
+	var count int64
+	err := s.DB.Model(&User{}).Where("username = ?", username).Count(&count).Error
+	return count > 0, err
+}
+
+// CreateUser 创建新用户
+func (s *Store) CreateUser(ctx context.Context, username, password, email string) error {
+	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
+	if err != nil {
+		return err
+	}
+	user := User{Username: username, Password: string(hashedPassword), Email: email}
+	return s.DB.Create(&user).Error
 }
 
 func (s *Store) UpdateBlock(id Vec3, w int) error {
@@ -159,101 +179,90 @@ func (s *Store) UpdateBlock(id Vec3, w int) error {
 	log.Printf("put %v -> %d", id, w)
 
 	// Begin transaction
-	tx, err := s.db.Begin()
-	if err != nil {
-		return err
-	}
+	tx := s.DB.Begin()
 	defer func() {
-		if err != nil {
+		if tx.Error != nil {
 			tx.Rollback()
 		}
 	}()
 
 	// Insert or update block
-	_, err = tx.Exec(
-		"REPLACE INTO blocks (chunk_x, chunk_z, block_x, block_y, block_z, block_type) VALUES (?, ?, ?, ?, ?, ?)",
-		cid.X, cid.Z, id.X, id.Y, id.Z, w,
-	)
+	block := Block{ChunkX: cid.X, ChunkZ: cid.Z, BlockX: id.X, BlockY: id.Y, BlockZ: id.Z, BlockType: int32(w)}
+	err := tx.Save(&block).Error
 	if err != nil {
 		return err
 	}
 
 	// Commit transaction
-	return tx.Commit()
+	return tx.Commit().Error
 }
 
 func (s *Store) UpdateCamera(x, y, z, rx, ry float32) error {
-	_, err := s.db.Exec(
-		"UPDATE camera SET x = ?, y = ?, z = ?, rx = ?, ry = ? WHERE id = 1",
-		x, y, z, rx, ry,
-	)
-	return err
+	camera := Camera{ID: 1, X: x, Y: y, Z: z, RX: rx, RY: ry}
+	return s.DB.Save(&camera).Error
 }
 
 func (s *Store) GetCamera() (x, y, z, rx, ry float32) {
 	// Default value if query fails
 	y = 16
 
-	err := s.db.QueryRow("SELECT x, y, z, rx, ry FROM camera WHERE id = 1").Scan(&x, &y, &z, &rx, &ry)
+	var camera Camera
+	err := s.DB.Where("id = ?", 1).First(&camera).Error
 	if err != nil {
 		log.Printf("Error getting camera: %v", err)
+	} else {
+		x = camera.X
+		y = camera.Y
+		z = camera.Z
+		rx = camera.RX
+		ry = camera.RY
 	}
 
 	return
 }
 
 func (s *Store) RangeBlocks(id Vec3, f func(bid Vec3, w int)) error {
-	rows, err := s.db.Query(
-		"SELECT block_x, block_y, block_z, block_type FROM blocks WHERE chunk_x = ? AND chunk_z = ?",
-		id.X, id.Z,
-	)
+	var blocks []Block
+	err := s.DB.Where("chunk_x = ? AND chunk_z = ?", id.X, id.Z).Find(&blocks).Error
 	if err != nil {
 		return err
 	}
-	defer rows.Close()
 
-	for rows.Next() {
-		var x, y, z, w int32
-		err := rows.Scan(&x, &y, &z, &w)
-		if err != nil {
-			return err
-		}
-		f(Vec3{x, y, z}, int(w))
+	for _, block := range blocks {
+		f(Vec3{block.BlockX, block.BlockY, block.BlockZ}, int(block.BlockType))
 	}
 
-	return rows.Err()
+	return nil
 }
 
 func (s *Store) UpdateChunkVersion(id Vec3, version string) error {
-	_, err := s.db.Exec(
-		"REPLACE INTO chunks (chunk_x, chunk_y, chunk_z, version) VALUES (?, ?, ?, ?)",
-		id.X, id.Y, id.Z, version,
-	)
-	return err
+	chunk := Chunk{ChunkX: id.X, ChunkY: id.Y, ChunkZ: id.Z, Version: version}
+	return s.DB.Save(&chunk).Error
 }
 
 func (s *Store) GetChunkVersion(id Vec3) string {
-	var version string
-	err := s.db.QueryRow(
-		"SELECT version FROM chunks WHERE chunk_x = ? AND chunk_y = ? AND chunk_z = ?",
-		id.X, id.Y, id.Z,
-	).Scan(&version)
-
+	var chunk Chunk
+	err := s.DB.Where("chunk_x = ? AND chunk_y = ? AND chunk_z = ?", id.X, id.Y, id.Z).First(&chunk).Error
 	if err != nil {
 		// If no version found, return empty string
-		if err == sql.ErrNoRows {
+		if err == gorm.ErrRecordNotFound {
 			return ""
 		}
 		log.Printf("Error getting chunk version: %v", err)
 		return ""
 	}
 
-	return version
+	return chunk.Version
 }
 
 func (s *Store) Close() {
-	if s.db != nil {
-		s.db.Close()
+	if s.DB != nil {
+		db, err := s.DB.DB()
+		if err != nil {
+			log.Printf("Error closing database connection: %v", err)
+		} else {
+			db.Close()
+		}
 	}
 }
 
